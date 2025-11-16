@@ -1,5 +1,11 @@
-# GraphRAG
+# GraphRAG(-DSPy)
 
+## Disclaimer: Experimental version (Nov 2025)
+
+This version of graphrag is an attempted port to DSPy - purely as an experiment.
+AI is used for this conversion. At this stage, the quality, performance and accuracy of this conversion code should be treated as highly suspect.
+
+## GraphRAG Background
 👉 [Microsoft Research Blog Post](https://www.microsoft.com/en-us/research/blog/graphrag-unlocking-llm-discovery-on-narrative-private-data/)<br/>
 👉 [Read the docs](https://microsoft.github.io/graphrag)<br/>
 👉 [GraphRAG Arxiv](https://arxiv.org/pdf/2404.16130)
