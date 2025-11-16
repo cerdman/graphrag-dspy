@@ -8,9 +8,13 @@ import traceback
 from dataclasses import dataclass
 from typing import Any
 
+import dspy
+
 from graphrag.config.defaults import graphrag_config_defaults
+from graphrag.dspy_modules.index import ClaimExtractionModule
 from graphrag.index.typing.error_handler import ErrorHandlerFn
 from graphrag.language_model.protocol.base import ChatModel
+from graphrag.language_model.providers.dspy.adapter import GraphRAGDSpyLM
 from graphrag.prompts.index.extract_claims import (
     CONTINUE_PROMPT,
     EXTRACT_CLAIMS_PROMPT,
@@ -46,6 +50,9 @@ class ClaimExtractor:
     _completion_delimiter_key: str
     _max_gleanings: int
     _on_error: ErrorHandlerFn
+    _use_dspy: bool
+    _dspy_lm: GraphRAGDSpyLM | None
+    _dspy_module: ClaimExtractionModule | None
 
     def __init__(
         self,
@@ -60,6 +67,7 @@ class ClaimExtractor:
         completion_delimiter_key: str | None = None,
         max_gleanings: int | None = None,
         on_error: ErrorHandlerFn | None = None,
+        use_dspy: bool = True,  # Enable DSPy by default
     ):
         """Init method definition."""
         self._model = model_invoker
@@ -83,6 +91,16 @@ class ClaimExtractor:
             else graphrag_config_defaults.extract_claims.max_gleanings
         )
         self._on_error = on_error or (lambda _e, _s, _d: None)
+        self._use_dspy = use_dspy
+
+        # Initialize DSPy components if enabled
+        if self._use_dspy:
+            self._dspy_lm = GraphRAGDSpyLM(chat_model=model_invoker)
+            # Don't use global dspy.configure() - use context manager instead
+            self._dspy_module = ClaimExtractionModule(max_iterations=self._max_gleanings)
+        else:
+            self._dspy_lm = None
+            self._dspy_module = None
 
     async def __call__(
         self, inputs: dict[str, Any], prompt_variables: dict | None = None
@@ -149,6 +167,41 @@ class ClaimExtractor:
     async def _process_document(
         self, prompt_args: dict, doc, doc_index: int
     ) -> list[dict]:
+        if self._use_dspy and self._dspy_module is not None:
+            return await self._process_document_dspy(prompt_args, doc)
+        else:
+            return await self._process_document_legacy(prompt_args, doc)
+
+    async def _process_document_dspy(
+        self, prompt_args: dict, doc
+    ) -> list[dict]:
+        """Process document using DSPy module."""
+        entity_specs = prompt_args.get(self._input_entity_spec_key, "")
+
+        # Call DSPy module - wrap in asyncio to handle sync DSPy interface
+        import asyncio
+
+        def run_dspy():
+            if self._dspy_module is None or self._dspy_lm is None:
+                return ""
+            # Use context manager to avoid global state pollution
+            with dspy.context(lm=self._dspy_lm):
+                result = self._dspy_module.forward(
+                    input_text=doc,
+                    entity_specs=entity_specs,
+                )
+                return result.extracted_claims
+
+        # Run DSPy in thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        claims_text = await loop.run_in_executor(None, run_dspy)
+
+        return self._parse_claim_tuples(claims_text, prompt_args)
+
+    async def _process_document_legacy(
+        self, prompt_args: dict, doc
+    ) -> list[dict]:
+        """Process document using legacy prompt-based approach."""
         record_delimiter = prompt_args.get(
             self._record_delimiter_key, DEFAULT_RECORD_DELIMITER
         )
