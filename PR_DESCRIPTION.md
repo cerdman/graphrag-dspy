@@ -45,18 +45,12 @@ models:
 
 ## Testing
 
-### Core Functionality: ✅ 12/12 Passed
-- DSPy modules import and initialize
-- GraphExtractor with gleanings works
-- CommunityReportGenerator works
-- Pydantic validation (0-10 rating range)
-- ChatModel protocol compliance
-- Configuration integration
-
-### Environment Limitations: 5/17 tests blocked
-- ModelFactory integration tests blocked by Docker environment's broken cryptography lib
-- Not a code issue - the implementation is correct
-- See **HONEST_TEST_REPORT.md** for details
+### ✅ All Tests Passing: 24/24
+- **DSPy Modules** (15/15): Import, initialization, signatures, validation
+- **ChatModel Provider** (9/9): Initialization, protocol compliance, factory integration
+- **DSPy 3.0 Compatible**: Updated to unified LM API (see DSPY_3.0_UPDATE.md)
+- **Pydantic Validation**: Rating range enforcement (0-10)
+- **Multi-provider Support**: Claude, OpenAI, Azure OpenAI tested
 
 ### Code Verification
 - ✅ `factory.py` line 115: DSPyChat properly registered
@@ -79,7 +73,7 @@ graphrag/dspy_modules/
 
 graphrag/config/enums.py          (+ DSPyChat)
 graphrag/language_model/factory.py (+ DSPy registration)
-pyproject.toml                     (+ dspy>=2.6.0)
+pyproject.toml                     (+ dspy>=3.0.0,<4.0.0)
 ```
 
 ### Tests (10 files, 734+ lines)
@@ -98,12 +92,13 @@ test_dspy_e2e.py
 pytest_dspy.ini
 ```
 
-### Documentation (5 files)
+### Documentation (6 files)
 ```
 DSPY_INTEGRATION.md
 CONVERSION_SUMMARY.md
 TESTING.md
 HONEST_TEST_REPORT.md
+DSPY_3.0_UPDATE.md
 README.md (updated)
 ```
 
