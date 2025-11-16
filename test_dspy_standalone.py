@@ -28,9 +28,16 @@ class DummyLM(dspy.LM):
         # DSPy expects JSON responses matching signature fields
         import json
 
-        # More specific pattern matching using signature field names
-        if "refined_entities" in prompt_text or "refined_relationships" in prompt_text:
-            # ExtractionRefinementSignature (ChainOfThought)
+        # Check for specific output field names (most specific first)
+        # DSPy prompts include "output_fields" or field names in the prompt
+
+        # ExtractionFormattingSignature - look for formatted_output field
+        if "formatted_output" in prompt_text:
+            response = {
+                "formatted_output": '("entity"<|>ALICE<|>PERSON<|>A person)##("entity"<|>TECHCORP<|>ORG<|>A company)##<|COMPLETE|>'
+            }
+        # ExtractionRefinementSignature - look for refinement-specific fields
+        elif ("refined_entities" in prompt_text and "refined_relationships" in prompt_text) or "refinement_rationale" in prompt_text:
             response = {
                 "reasoning": "Checking extraction quality",
                 "refinement_rationale": "Extractions look good",
@@ -38,57 +45,22 @@ class DummyLM(dspy.LM):
                 "refined_entities": 'ALICE<|>PERSON<|>A person',
                 "refined_relationships": 'ALICE<|>TECHCORP<|>works at<|>1.0'
             }
-        elif "relationships" in prompt_text and "entity" not in prompt_text:
-            # RelationshipIdentificationSignature: reasoning (from ChainOfThought), rationale, relationships
+        # RelationshipIdentificationSignature - look for rationale + relationships
+        elif "rationale" in prompt_text and "relationships" in prompt_text:
             response = {
                 "reasoning": "Let me identify relationships between entities",
                 "rationale": "Identified relationships between entities",
                 "relationships": 'ALICE<|>TECHCORP<|>works at<|>1.0'
             }
-        elif "entities" in prompt_text and "relationship" not in prompt_text:
-            # EntityIdentificationSignature: reasoning (from ChainOfThought), rationale, entities
+        # EntityIdentificationSignature - look for rationale + entities
+        elif "rationale" in prompt_text and "entities" in prompt_text:
             response = {
                 "reasoning": "Let me identify entities in the text",
                 "rationale": "Identified entities from the text",
                 "entities": 'ALICE<|>PERSON<|>A person##TECHCORP<|>ORGANIZATION<|>A company'
             }
-        elif "refinement" in prompt_text or "needs_refinement" in prompt_text:
-            # ExtractionRefinementSignature (ChainOfThought)
-            response = {
-                "reasoning": "Checking extraction quality",
-                "refinement_rationale": "Extractions look good",
-                "needs_refinement": False,
-                "refined_entities": 'ALICE<|>PERSON<|>A person',
-                "refined_relationships": 'ALICE<|>TECHCORP<|>works at<|>1.0'
-            }
-        elif "format" in prompt_text or "tuple_delimiter" in prompt_text:
-            # ExtractionFormattingSignature (Predict - no reasoning needed)
-            response = {
-                "formatted_output": '("entity"<|>ALICE<|>PERSON<|>A person)##("entity"<|>TECHCORP<|>ORG<|>A company)##<|COMPLETE|>'
-            }
-        elif "structure" in prompt_text:
-            # CommunityStructureAnalysisSignature (ChainOfThought)
-            response = {
-                "reasoning": "Analyzing community structure",
-                "structure_analysis": "ALICE is connected to TECHCORP through employment",
-                "key_entities": "ALICE, TECHCORP"
-            }
-        elif "impact" in prompt_text or "severity" in prompt_text:
-            # CommunityImpactAnalysisSignature (ChainOfThought)
-            response = {
-                "reasoning": "Assessing community impact",
-                "impact_analysis": "High impact community with strong organizational ties",
-                "severity_rating": 8.5,
-                "rating_rationale": "Important employment relationship"
-            }
-        elif "findings" in prompt_text:
-            # CommunityFindingsSignature (ChainOfThought)
-            response = {
-                "reasoning": "Extracting key findings",
-                "findings_list": "1. Alice works at TechCorp\\n2. Strong organizational connection"
-            }
-        elif "report" in prompt_text or "synthesize" in prompt_text:
-            # ReportSynthesisSignature (ChainOfThought) - return the full report structure
+        # ReportSynthesisSignature - look for report field
+        elif "report" in prompt_text and ("structure_analysis" in prompt_text or "max_length" in prompt_text):
             response = {
                 "reasoning": "Synthesizing all analyses into final report",
                 "report": json.dumps({
@@ -101,38 +73,59 @@ class DummyLM(dspy.LM):
                     "rating_explanation": "Strong organizational ties"
                 })
             }
-        elif "claim" in prompt_text and "validation" in prompt_text:
-            # ClaimValidationSignature (ChainOfThought)
+        # CommunityStructureAnalysisSignature
+        elif "structure_analysis" in prompt_text and "key_entities" in prompt_text:
+            response = {
+                "reasoning": "Analyzing community structure",
+                "structure_analysis": "ALICE is connected to TECHCORP through employment",
+                "key_entities": "ALICE, TECHCORP"
+            }
+        # CommunityImpactAnalysisSignature
+        elif "impact_analysis" in prompt_text or ("severity_rating" in prompt_text and "rating_rationale" in prompt_text):
+            response = {
+                "reasoning": "Assessing community impact",
+                "impact_analysis": "High impact community with strong organizational ties",
+                "severity_rating": 8.5,
+                "rating_rationale": "Important employment relationship"
+            }
+        # CommunityFindingsSignature
+        elif "findings_list" in prompt_text:
+            response = {
+                "reasoning": "Extracting key findings",
+                "findings_list": "1. Alice works at TechCorp\\n2. Strong organizational connection"
+            }
+        # ClaimValidationSignature
+        elif "validated_claims" in prompt_text or "needs_more_extraction" in prompt_text:
             response = {
                 "reasoning": "Validating extracted claims",
                 "validation_thought": "Claims appear valid",
                 "validated_claims": "Alice is an employee of TechCorp",
                 "needs_more_extraction": False
             }
-        elif "claim" in prompt_text:
-            # ClaimIdentificationSignature (ChainOfThought)
+        # ClaimIdentificationSignature
+        elif "initial_claims" in prompt_text or ("thought" in prompt_text and "claim" in prompt_text):
             response = {
                 "reasoning": "Identifying claims in text",
                 "thought": "Analyzing claims in the text",
                 "initial_claims": "Alice claims to be CEO of TechCorp"
             }
-        elif "extractive" in prompt_text or "key_points" in prompt_text:
-            # ExtractiveSummarySignature (ChainOfThought)
+        # SummaryFusionSignature - check BEFORE extractive/abstractive (it contains both as inputs)
+        elif "fused_summary" in prompt_text or ("key_points" in prompt_text and "abstract_summary" in prompt_text):
+            response = {
+                "reasoning": "Fusing extractive and abstractive summaries",
+                "fused_summary": "Alice is a person who works at TechCorp"
+            }
+        # ExtractiveSummarySignature
+        elif "key_points" in prompt_text:
             response = {
                 "reasoning": "Extracting key points",
                 "key_points": "Alice, TechCorp, employment"
             }
-        elif "abstractive" in prompt_text or "abstract_summary" in prompt_text:
-            # AbstractiveSummarySignature (ChainOfThought)
+        # AbstractiveSummarySignature
+        elif "abstract_summary" in prompt_text:
             response = {
                 "reasoning": "Creating abstract summary",
                 "abstract_summary": "Alice works at TechCorp"
-            }
-        elif "fusion" in prompt_text or "fused_summary" in prompt_text:
-            # SummaryFusionSignature (ChainOfThought)
-            response = {
-                "reasoning": "Fusing extractive and abstractive summaries",
-                "fused_summary": "Alice is a person who works at TechCorp"
             }
         else:
             response = {"response": "Test response"}
