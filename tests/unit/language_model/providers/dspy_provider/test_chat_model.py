@@ -29,12 +29,12 @@ class TestDSPyChatModel:
 
         config = LanguageModelConfig(
             type="dspy_chat",
-            model="test-model",
+            model="gpt-4",  # Use real model name for tiktoken
             model_provider="openai",
             api_key="test-key",
         )
 
-        with patch("dspy.OpenAI"):
+        with patch("dspy.LM"):
             with patch("dspy.configure"):
                 model = DSPyChatModel(name="test", config=config)
                 assert model.name == "test"
@@ -56,9 +56,9 @@ class TestDSPyChatModel:
 class TestDSPyChatModelProviders:
     """Tests for different provider configurations."""
 
-    @patch("dspy.Claude")
+    @patch("dspy.LM")
     @patch("dspy.configure")
-    def test_claude_provider_setup(self, mock_configure, mock_claude):
+    def test_claude_provider_setup(self, mock_configure, mock_lm):
         """Test Claude provider initialization."""
         from graphrag.language_model.providers.dspy.chat_model import (
             DSPyChatModel,
@@ -74,19 +74,22 @@ class TestDSPyChatModelProviders:
             api_key="test-key",
             max_tokens=4096,
             temperature=0.0,
+            encoding_model="cl100k_base",  # Explicit encoding for Claude
         )
 
         model = DSPyChatModel(name="claude_test", config=config)
 
-        # Verify Claude was called
-        mock_claude.assert_called_once()
-        call_kwargs = mock_claude.call_args[1]
-        assert call_kwargs["model"] == "claude-sonnet-4"
+        # Verify LM was called with anthropic provider
+        mock_lm.assert_called_once()
+        call_kwargs = mock_lm.call_args[1]
+        # Model string should be "anthropic/claude-sonnet-4"
+        assert "claude-sonnet-4" in call_kwargs.get("model", "")
+        assert "anthropic" in call_kwargs.get("model", "")
         assert call_kwargs["api_key"] == "test-key"
 
-    @patch("dspy.OpenAI")
+    @patch("dspy.LM")
     @patch("dspy.configure")
-    def test_openai_provider_setup(self, mock_configure, mock_openai):
+    def test_openai_provider_setup(self, mock_configure, mock_lm):
         """Test OpenAI provider initialization."""
         from graphrag.language_model.providers.dspy.chat_model import (
             DSPyChatModel,
@@ -104,12 +107,12 @@ class TestDSPyChatModelProviders:
 
         model = DSPyChatModel(name="openai_test", config=config)
 
-        # Verify OpenAI was called
-        mock_openai.assert_called_once()
+        # Verify LM was called with openai provider
+        mock_lm.assert_called_once()
 
-    @patch("dspy.AzureOpenAI")
+    @patch("dspy.LM")
     @patch("dspy.configure")
-    def test_azure_provider_setup(self, mock_configure, mock_azure):
+    def test_azure_provider_setup(self, mock_configure, mock_lm):
         """Test Azure OpenAI provider initialization."""
         from graphrag.language_model.providers.dspy.chat_model import (
             DSPyChatModel,
@@ -130,8 +133,8 @@ class TestDSPyChatModelProviders:
 
         model = DSPyChatModel(name="azure_test", config=config)
 
-        # Verify AzureOpenAI was called
-        mock_azure.assert_called_once()
+        # Verify LM was called with azure provider
+        mock_lm.assert_called_once()
 
 
 class TestDSPyModelResponse:

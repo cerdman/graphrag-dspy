@@ -72,9 +72,8 @@ class DSPyChatModel:
         model_provider = self.config.model_provider.lower()
         model = self.config.deployment_name or self.config.model
 
-        # Build kwargs for DSPy model
+        # Build kwargs for DSPy LM (unified API in DSPy 3.0+)
         kwargs: dict[str, Any] = {
-            "model": model,
             "max_tokens": self.config.max_tokens or 4096,
             "temperature": self.config.temperature or 0.0,
         }
@@ -83,42 +82,30 @@ class DSPyChatModel:
         if self.config.api_key:
             kwargs["api_key"] = self.config.api_key
 
-        # Configure based on provider
+        # Build model string for DSPy 3.0 unified LM API
+        # Format: "provider/model_name"
         if model_provider == "anthropic" or model.startswith("claude"):
             # Claude via Anthropic
-            self._lm = dspy.Claude(
-                model=model if "/" not in model else model.split("/")[-1],
-                api_key=kwargs.get("api_key"),
-                max_tokens=kwargs.get("max_tokens", 4096),
-                temperature=kwargs.get("temperature", 0.0),
-            )
+            model_str = f"anthropic/{model}" if "/" not in model else model
         elif model_provider == "openai":
             # OpenAI
-            self._lm = dspy.OpenAI(
-                model=model,
-                api_key=kwargs.get("api_key"),
-                max_tokens=kwargs.get("max_tokens", 4096),
-                temperature=kwargs.get("temperature", 0.0),
-            )
+            model_str = f"openai/{model}" if "/" not in model else model
         elif model_provider == "azure":
-            # Azure OpenAI
-            self._lm = dspy.AzureOpenAI(
-                deployment_id=self.config.deployment_name or model,
-                api_key=kwargs.get("api_key"),
-                api_base=self.config.api_base,
-                api_version=self.config.api_version,
-                max_tokens=kwargs.get("max_tokens", 4096),
-                temperature=kwargs.get("temperature", 0.0),
-            )
+            # Azure OpenAI - requires additional config
+            model_str = f"azure/{self.config.deployment_name or model}"
+            if self.config.api_base:
+                kwargs["api_base"] = self.config.api_base
+            if self.config.api_version:
+                kwargs["api_version"] = self.config.api_version
         else:
-            # Generic LM (falls back to DSPy's default LM initialization)
+            # Generic provider
+            model_str = f"{model_provider}/{model}"
             logger.warning(
-                f"Unknown provider '{model_provider}', using DSPy default LM"
+                f"Using generic DSPy LM with provider '{model_provider}'"
             )
-            self._lm = dspy.LM(
-                model=f"{model_provider}/{model}",
-                **kwargs,
-            )
+
+        # Create unified LM instance (DSPy 3.0+ API)
+        self._lm = dspy.LM(model=model_str, **kwargs)
 
         # Configure DSPy to use this LM
         dspy.configure(lm=self._lm)
