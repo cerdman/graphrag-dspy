@@ -197,8 +197,8 @@ class ReportSynthesisSignature(dspy.Signature):
     rating_rationale: str = dspy.InputField(desc="Rating explanation")
     max_length: int = dspy.InputField(desc="Max word count")
 
-    report: "CommunityReportResponse" = dspy.OutputField(
-        desc="Complete structured report"
+    report: str = dspy.OutputField(
+        desc="Complete structured report as JSON string"
     )
 
 
@@ -269,7 +269,7 @@ class CommunityReportModule(dspy.Module):
         findings_result = self.findings_analyst(input_text=input_text)
 
         # Synthesize into final report
-        report = self.synthesizer(
+        synthesis_result = self.synthesizer(
             structure_analysis=structure_result.structure_analysis,
             impact_analysis=impact_result.impact_analysis,
             findings=findings_result.findings_list,
@@ -278,7 +278,12 @@ class CommunityReportModule(dspy.Module):
             max_length=max_report_length,
         )
 
-        return report
+        # Parse the JSON report string into CommunityReportResponse
+        import json
+        report_data = json.loads(synthesis_result.report) if isinstance(synthesis_result.report, str) else synthesis_result.report
+        report_obj = CommunityReportResponse(**report_data) if isinstance(report_data, dict) else report_data
+
+        return dspy.Prediction(report=report_obj)
 
 
 # ============================================================================

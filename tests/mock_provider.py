@@ -123,3 +123,14 @@ class MockEmbeddingLLM:
         if isinstance(text_list, str):
             return [[1.0, 1.0, 1.0]]
         return [[1.0, 1.0, 1.0] for _ in text_list]
+
+
+def create_mock_chat_model(responses: list[str] | None = None) -> MockChatLLM:
+    """Create a mock chat model with default responses for testing."""
+    default_responses = [
+        '("entity"<|>ALICE<|>PERSON<|>A person)##("entity"<|>TECHCORP<|>ORGANIZATION<|>A company)##<|COMPLETE|>',
+        '{"title": "Test Community", "summary": "Test summary", "rating": 5.0, "rating_explanation": "Test", "findings": [{"summary": "Finding 1", "explanation": "Test explanation"}]}',
+        "Additional entities found.",
+        "Y",
+    ]
+    return MockChatLLM(responses=responses or default_responses)

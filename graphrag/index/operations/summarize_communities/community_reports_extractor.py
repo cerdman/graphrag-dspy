@@ -80,7 +80,7 @@ class CommunityReportsExtractor:
         # Initialize DSPy components if enabled
         if self._use_dspy:
             self._dspy_lm = GraphRAGDSpyLM(chat_model=model_invoker)
-            dspy.configure(lm=self._dspy_lm)
+            # Don't use global dspy.configure() - use context manager instead
             self._dspy_module = CommunityReportModule()
         else:
             self._dspy_lm = None
@@ -100,14 +100,16 @@ class CommunityReportsExtractor:
             import asyncio
 
             def run_dspy():
-                if self._dspy_module is None:
+                if self._dspy_module is None or self._dspy_lm is None:
                     return None
-                result = self._dspy_module.forward(
-                    input_text=input_text,
-                    max_report_length=self._max_report_length,
-                )
-                # DSPy returns a Prediction with a 'report' field
-                return result.report
+                # Use context manager to avoid global state pollution
+                with dspy.context(lm=self._dspy_lm):
+                    result = self._dspy_module.forward(
+                        input_text=input_text,
+                        max_report_length=self._max_report_length,
+                    )
+                    # DSPy returns a Prediction with a 'report' field
+                    return result.report
 
             # Run DSPy in thread pool
             loop = asyncio.get_event_loop()

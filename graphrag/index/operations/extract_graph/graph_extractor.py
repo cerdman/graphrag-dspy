@@ -98,7 +98,7 @@ class GraphExtractor:
         # Initialize DSPy components if enabled
         if self._use_dspy:
             self._dspy_lm = GraphRAGDSpyLM(chat_model=model_invoker)
-            dspy.configure(lm=self._dspy_lm)
+            # Don't use global dspy.configure() - use context manager instead
             self._dspy_module = GraphExtractionModule(
                 max_gleanings=self._max_gleanings
             )
@@ -189,16 +189,18 @@ class GraphExtractor:
         import asyncio
 
         def run_dspy():
-            if self._dspy_module is None:
+            if self._dspy_module is None or self._dspy_lm is None:
                 return ""
-            result = self._dspy_module.forward(
-                entity_types=entity_types,
-                input_text=text,
-                tuple_delimiter=tuple_delimiter,
-                record_delimiter=record_delimiter,
-                completion_delimiter=completion_delimiter,
-            )
-            return result.extracted_data
+            # Use context manager to avoid global state pollution
+            with dspy.context(lm=self._dspy_lm):
+                result = self._dspy_module.forward(
+                    entity_types=entity_types,
+                    input_text=text,
+                    tuple_delimiter=tuple_delimiter,
+                    record_delimiter=record_delimiter,
+                    completion_delimiter=completion_delimiter,
+                )
+                return result.extracted_data
 
         # Run DSPy in thread pool to avoid blocking
         loop = asyncio.get_event_loop()
