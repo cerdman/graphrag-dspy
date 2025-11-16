@@ -41,6 +41,27 @@ This repository presents a methodology for using knowledge graph memory structur
 - To start developing _GraphRAG_, see [DEVELOPING.md](./DEVELOPING.md)
 - Join the conversation and provide feedback in the [GitHub Discussions tab!](https://github.com/microsoft/graphrag/discussions)
 
+## DSPy Integration 🚀
+
+This fork includes **DSPy integration** for programmatic prompt engineering! DSPy provides:
+
+- 🎯 **Structured Prompts**: Define clear input/output signatures
+- 🤖 **Claude Support**: Native support for Anthropic Claude models
+- 🔧 **Optimization**: Automatic prompt improvement capabilities
+- 🧩 **Modularity**: Composable LLM components
+
+**Quick Start with Claude:**
+```yaml
+models:
+  chat:
+    type: dspy_chat
+    model_provider: anthropic
+    model: claude-sonnet-4-20250514
+    api_key: ${ANTHROPIC_API_KEY}
+```
+
+See [DSPY_INTEGRATION.md](./DSPY_INTEGRATION.md) for complete documentation.
+
 ## Prompt Tuning
 
 Using _GraphRAG_ with your data out of the box may not yield the best possible results.

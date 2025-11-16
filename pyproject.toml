@@ -39,6 +39,7 @@ dependencies = [
     # Async IO
     "aiofiles>=24.1.0",
     # LLM
+    "dspy>=2.6.0",
     "fnllm[azure,openai]>=0.4.1",
     "json-repair>=0.30.3",
     "openai>=1.68.0",
