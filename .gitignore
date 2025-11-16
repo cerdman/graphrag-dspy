@@ -13,7 +13,7 @@ tests/fixtures/cache
 tests/fixtures/*/cache
 tests/fixtures/*/output
 output/lancedb
-
+.venv/
 
 # Random
 .DS_Store
@@ -58,3 +58,6 @@ docsite/
 
 # Jupyter notebook
 .ipynb_checkpoints/
+
+.gemini/
+gha-creds-*.json
