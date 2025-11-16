@@ -108,7 +108,7 @@ class GraphExtractor:
             )
             or DEFAULT_COMPLETION_DELIMITER,
             self._entity_types_key: ",".join(
-                prompt_variables[self._entity_types_key] or DEFAULT_ENTITY_TYPES
+                prompt_variables.get(self._entity_types_key) or DEFAULT_ENTITY_TYPES
             ),
         }
 
