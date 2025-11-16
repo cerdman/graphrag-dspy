@@ -7,10 +7,13 @@ import logging
 import traceback
 from dataclasses import dataclass
 
+import dspy
 from pydantic import BaseModel, Field
 
+from graphrag.dspy_modules.index import CommunityReportModule
 from graphrag.index.typing.error_handler import ErrorHandlerFn
 from graphrag.language_model.protocol.base import ChatModel
+from graphrag.language_model.providers.dspy.adapter import GraphRAGDSpyLM
 from graphrag.prompts.index.community_report import COMMUNITY_REPORT_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -55,6 +58,9 @@ class CommunityReportsExtractor:
     _output_formatter_prompt: str
     _on_error: ErrorHandlerFn
     _max_report_length: int
+    _use_dspy: bool
+    _dspy_lm: GraphRAGDSpyLM | None
+    _dspy_module: CommunityReportModule | None
 
     def __init__(
         self,
@@ -62,15 +68,63 @@ class CommunityReportsExtractor:
         extraction_prompt: str | None = None,
         on_error: ErrorHandlerFn | None = None,
         max_report_length: int | None = None,
+        use_dspy: bool = True,  # Enable DSPy by default
     ):
         """Init method definition."""
         self._model = model_invoker
         self._extraction_prompt = extraction_prompt or COMMUNITY_REPORT_PROMPT
         self._on_error = on_error or (lambda _e, _s, _d: None)
         self._max_report_length = max_report_length or 1500
+        self._use_dspy = use_dspy
+
+        # Initialize DSPy components if enabled
+        if self._use_dspy:
+            self._dspy_lm = GraphRAGDSpyLM(chat_model=model_invoker)
+            dspy.configure(lm=self._dspy_lm)
+            self._dspy_module = CommunityReportModule()
+        else:
+            self._dspy_lm = None
+            self._dspy_module = None
 
     async def __call__(self, input_text: str):
         """Call method definition."""
+        if self._use_dspy and self._dspy_module is not None:
+            return await self._generate_report_dspy(input_text)
+        else:
+            return await self._generate_report_legacy(input_text)
+
+    async def _generate_report_dspy(self, input_text: str):
+        """Generate report using DSPy module."""
+        output = None
+        try:
+            import asyncio
+
+            def run_dspy():
+                if self._dspy_module is None:
+                    return None
+                result = self._dspy_module.forward(
+                    input_text=input_text,
+                    max_report_length=self._max_report_length,
+                )
+                # DSPy returns a Prediction with a 'report' field
+                return result.report
+
+            # Run DSPy in thread pool
+            loop = asyncio.get_event_loop()
+            output = await loop.run_in_executor(None, run_dspy)
+
+        except Exception as e:
+            logger.exception("error generating community report (dspy)")
+            self._on_error(e, traceback.format_exc(), None)
+
+        text_output = self._get_text_output(output) if output else ""
+        return CommunityReportsResult(
+            structured_output=output,
+            output=text_output,
+        )
+
+    async def _generate_report_legacy(self, input_text: str):
+        """Generate report using legacy prompt-based approach."""
         output = None
         try:
             prompt = self._extraction_prompt.format(**{
