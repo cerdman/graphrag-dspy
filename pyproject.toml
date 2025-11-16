@@ -1,25 +1,11 @@
 [project]
-name = "graphrag"
+name = "graphrag-dspy"
 # Maintainers: do not change the version here manually, use ./scripts/release.sh
-version = "2.7.0"
+version = "2.7.0-dspy-0.1"
 description = "GraphRAG: A graph-based retrieval-augmented generation (RAG) system."
 authors = [
-    {name = "Alonso Guevara Fernández", email = "alonsog@microsoft.com"},
-    {name = "Andrés Morales Esquivel", email = "andresmor@microsoft.com"},
-    {name = "Chris Trevino", email = "chtrevin@microsoft.com"},
-    {name = "David Tittsworth", email = "datittsw@microsoft.com"},
-    {name = "Dayenne de Souza", email = "ddesouza@microsoft.com"},
-    {name = "Derek Worthen", email = "deworthe@microsoft.com"},
-    {name = "Gaudy Blanco Meneses", email = "gaudyb@microsoft.com"},
-    {name = "Ha Trinh", email = "trinhha@microsoft.com"},
-    {name = "Jonathan Larson", email = "jolarso@microsoft.com"},
-    {name = "Josh Bradley", email = "joshbradley@microsoft.com"},
-    {name = "Kate Lytvynets", email = "kalytv@microsoft.com"},
-    {name = "Kenny Zhang", email = "zhangken@microsoft.com"},
-    {name = "Mónica Carvajal"},
-    {name = "Nathan Evans", email = "naevans@microsoft.com"},
-    {name = "Rodrigo Racanicci", email = "rracanicci@microsoft.com"},
-    {name = "Sarah Smith", email = "smithsarah@microsoft.com"},
+    {name = "Colin Erdman", email = "colin.erdman@gmail.com"},
+
 ]
 license = "MIT"
 readme = "README.md"
@@ -39,6 +25,7 @@ dependencies = [
     # Async IO
     "aiofiles>=24.1.0",
     # LLM
+    "dspy>=3.0.0,<4.0.0",  # DSPy 3.0+ uses unified LM API
     "fnllm[azure,openai]>=0.4.1",
     "json-repair>=0.30.3",
     "openai>=1.68.0",
