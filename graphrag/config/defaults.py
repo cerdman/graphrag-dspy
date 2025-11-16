@@ -46,7 +46,7 @@ from graphrag.language_model.providers.litellm.services.retry.retry import Retry
 
 DEFAULT_OUTPUT_BASE_DIR = "output"
 DEFAULT_CHAT_MODEL_ID = "default_chat_model"
-DEFAULT_CHAT_MODEL_TYPE = ModelType.Chat
+DEFAULT_CHAT_MODEL_TYPE = ModelType.DSPyChat
 DEFAULT_CHAT_MODEL = "gpt-4-turbo-preview"
 DEFAULT_CHAT_MODEL_AUTH_TYPE = AuthType.APIKey
 DEFAULT_EMBEDDING_MODEL_ID = "default_embedding_model"

@@ -1,7 +1,7 @@
 models:
   default_chat_model:
     api_key: ${CUSTOM_API_KEY}
-    type: chat
+    type: dspy_chat
     model_provider: openai
     model: gpt-4-turbo-preview
   default_embedding_model:
