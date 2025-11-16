@@ -6,8 +6,12 @@
 import json
 from dataclasses import dataclass
 
+import dspy
+
+from graphrag.dspy_modules.index import DescriptionSummaryModule
 from graphrag.index.typing.error_handler import ErrorHandlerFn
 from graphrag.language_model.protocol.base import ChatModel
+from graphrag.language_model.providers.dspy.adapter import GraphRAGDSpyLM
 from graphrag.prompts.index.summarize_descriptions import SUMMARIZE_PROMPT
 from graphrag.tokenizer.get_tokenizer import get_tokenizer
 
@@ -33,6 +37,9 @@ class SummarizeExtractor:
     _on_error: ErrorHandlerFn
     _max_summary_length: int
     _max_input_tokens: int
+    _use_dspy: bool
+    _dspy_lm: GraphRAGDSpyLM | None
+    _dspy_module: DescriptionSummaryModule | None
 
     def __init__(
         self,
@@ -41,6 +48,7 @@ class SummarizeExtractor:
         max_input_tokens: int,
         summarization_prompt: str | None = None,
         on_error: ErrorHandlerFn | None = None,
+        use_dspy: bool = True,  # Enable DSPy by default
     ):
         """Init method definition."""
         # TODO: streamline construction
@@ -50,6 +58,16 @@ class SummarizeExtractor:
         self._on_error = on_error or (lambda _e, _s, _d: None)
         self._max_summary_length = max_summary_length
         self._max_input_tokens = max_input_tokens
+        self._use_dspy = use_dspy
+
+        # Initialize DSPy components if enabled
+        if self._use_dspy:
+            self._dspy_lm = GraphRAGDSpyLM(chat_model=model_invoker)
+            # Don't use global dspy.configure() - use context manager instead
+            self._dspy_module = DescriptionSummaryModule()
+        else:
+            self._dspy_lm = None
+            self._dspy_module = None
 
     async def __call__(
         self,
@@ -119,6 +137,36 @@ class SummarizeExtractor:
         self, id: str | tuple[str, str] | list[str], descriptions: list[str]
     ):
         """Summarize descriptions using the LLM."""
+        if self._use_dspy and self._dspy_module is not None:
+            return await self._summarize_with_dspy(descriptions)
+        else:
+            return await self._summarize_with_legacy(id, descriptions)
+
+    async def _summarize_with_dspy(self, descriptions: list[str]) -> str:
+        """Summarize descriptions using DSPy module."""
+        import asyncio
+
+        def run_dspy():
+            if self._dspy_module is None or self._dspy_lm is None:
+                return ""
+            # Use context manager to avoid global state pollution
+            with dspy.context(lm=self._dspy_lm):
+                # Join descriptions with newlines for the module
+                descriptions_text = "\\n".join(descriptions)
+                result = self._dspy_module.forward(
+                    descriptions=descriptions_text
+                )
+                return result.summary
+
+        # Run DSPy in thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        summary = await loop.run_in_executor(None, run_dspy)
+        return summary
+
+    async def _summarize_with_legacy(
+        self, id: str | tuple[str, str] | list[str], descriptions: list[str]
+    ) -> str:
+        """Summarize descriptions using legacy prompt-based approach."""
         response = await self._model.achat(
             self._summarization_prompt.format(**{
                 ENTITY_NAME_KEY: json.dumps(id, ensure_ascii=False),

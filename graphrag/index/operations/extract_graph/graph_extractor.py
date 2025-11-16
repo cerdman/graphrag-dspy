@@ -10,12 +10,15 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+import dspy
 import networkx as nx
 
 from graphrag.config.defaults import graphrag_config_defaults
+from graphrag.dspy_modules.index import GraphExtractionModule
 from graphrag.index.typing.error_handler import ErrorHandlerFn
 from graphrag.index.utils.string import clean_str
 from graphrag.language_model.protocol.base import ChatModel
+from graphrag.language_model.providers.dspy.adapter import GraphRAGDSpyLM
 from graphrag.prompts.index.extract_graph import (
     CONTINUE_PROMPT,
     GRAPH_EXTRACTION_PROMPT,
@@ -54,6 +57,9 @@ class GraphExtractor:
     _summarization_prompt: str
     _max_gleanings: int
     _on_error: ErrorHandlerFn
+    _use_dspy: bool
+    _dspy_lm: GraphRAGDSpyLM | None
+    _dspy_module: GraphExtractionModule | None
 
     def __init__(
         self,
@@ -67,6 +73,7 @@ class GraphExtractor:
         join_descriptions=True,
         max_gleanings: int | None = None,
         on_error: ErrorHandlerFn | None = None,
+        use_dspy: bool = True,  # Enable DSPy by default
     ):
         """Init method definition."""
         # TODO: streamline construction
@@ -86,6 +93,18 @@ class GraphExtractor:
             else graphrag_config_defaults.extract_graph.max_gleanings
         )
         self._on_error = on_error or (lambda _e, _s, _d: None)
+        self._use_dspy = use_dspy
+
+        # Initialize DSPy components if enabled
+        if self._use_dspy:
+            self._dspy_lm = GraphRAGDSpyLM(chat_model=model_invoker)
+            # Don't use global dspy.configure() - use context manager instead
+            self._dspy_module = GraphExtractionModule(
+                max_gleanings=self._max_gleanings
+            )
+        else:
+            self._dspy_lm = None
+            self._dspy_module = None
 
     async def __call__(
         self, texts: list[str], prompt_variables: dict[str, Any] | None = None
@@ -143,6 +162,56 @@ class GraphExtractor:
     async def _process_document(
         self, text: str, prompt_variables: dict[str, str]
     ) -> str:
+        if self._use_dspy and self._dspy_module is not None:
+            # Use DSPy module for extraction
+            return await self._process_document_dspy(text, prompt_variables)
+        else:
+            # Use legacy prompt-based extraction
+            return await self._process_document_legacy(text, prompt_variables)
+
+    async def _process_document_dspy(
+        self, text: str, prompt_variables: dict[str, str]
+    ) -> str:
+        """Process document using DSPy module."""
+        # Extract parameters from prompt_variables
+        entity_types = prompt_variables.get(self._entity_types_key, "")
+        tuple_delimiter = prompt_variables.get(
+            self._tuple_delimiter_key, DEFAULT_TUPLE_DELIMITER
+        )
+        record_delimiter = prompt_variables.get(
+            self._record_delimiter_key, DEFAULT_RECORD_DELIMITER
+        )
+        completion_delimiter = prompt_variables.get(
+            self._completion_delimiter_key, DEFAULT_COMPLETION_DELIMITER
+        )
+
+        # Call DSPy module - wrap in asyncio to handle sync DSPy interface
+        import asyncio
+
+        def run_dspy():
+            if self._dspy_module is None or self._dspy_lm is None:
+                return ""
+            # Use context manager to avoid global state pollution
+            with dspy.context(lm=self._dspy_lm):
+                result = self._dspy_module.forward(
+                    entity_types=entity_types,
+                    input_text=text,
+                    tuple_delimiter=tuple_delimiter,
+                    record_delimiter=record_delimiter,
+                    completion_delimiter=completion_delimiter,
+                )
+                return result.extracted_data
+
+        # Run DSPy in thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(None, run_dspy)
+
+        return results
+
+    async def _process_document_legacy(
+        self, text: str, prompt_variables: dict[str, str]
+    ) -> str:
+        """Process document using legacy prompt-based approach."""
         response = await self._model.achat(
             self._extraction_prompt.format(**{
                 **prompt_variables,
